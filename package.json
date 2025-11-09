@@ -8,6 +8,9 @@
     "build": "anchor build",
     "deploy": "anchor deploy",
     "create-token": "npx esrun scripts/create-token-mint.ts",
+    "initialize": "npx esrun scripts/initialize-program.ts",
+    "test-reward": "npx esrun scripts/test-reward.ts",
+    "update-metadata": "npx esrun scripts/update-metadata.ts",
     "create-account": "npx esrun scripts/create-token-account.ts",
     "mint-tokens": "npx esrun scripts/mint-tokens.ts",
     "transfer-tokens": "npx esrun scripts/transfer-tokens.ts"
