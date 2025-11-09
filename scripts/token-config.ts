@@ -12,6 +12,9 @@ export const TOKEN_CONFIG = {
   // Program ID (dgenerate smart contract)
   PROGRAM_ID: new PublicKey("EPKw6RHc8Bf7m8BpKxv66NMmzqwnn7tSRwcyJ9cNbNnD"),
   
+  // Game State Account (initialized)
+  GAME_STATE_ADDRESS: new PublicKey("3iJN6JPCgjrhBKyMaRDe9Kjy5X5U562padf1NKEGohhM"),
+  
   // Game Authority PDA (mint authority)
   GAME_AUTHORITY_PDA: new PublicKey("FvLbjrPUZzvz3N1YbE136XbqdzMphSHY2rXUuWRWoicY"),
   
@@ -22,7 +25,7 @@ export const TOKEN_CONFIG = {
   NAME: "dgenerate",
   SYMBOL: "DGEN",
   DECIMALS: 9,
-  IMAGE_URI: "https://ibb.co/qY3pSx5y",
+  IMAGE_URI: "https://i.ibb.co/m5V4jS8D/dgenerate.png",
   
   // PDA Seeds
   GAME_AUTHORITY_SEED: "game_authority",
