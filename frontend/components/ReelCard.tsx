@@ -10,9 +10,10 @@ interface ReelCardProps {
   actualPrompt: string;
   onGuessSubmitted?: () => void;
   isActive: boolean;
+  mediaType?: 'image' | 'video';
 }
 
-export default function ReelCard({ imageId, imageUrl, actualPrompt, onGuessSubmitted, isActive }: ReelCardProps) {
+export default function ReelCard({ imageId, imageUrl, actualPrompt, onGuessSubmitted, isActive, mediaType = 'image' }: ReelCardProps) {
   const { publicKey } = useWallet();
   const [guess, setGuess] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -23,13 +24,37 @@ export default function ReelCard({ imageId, imageUrl, actualPrompt, onGuessSubmi
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createPrompt, setCreatePrompt] = useState('');
   const [creating, setCreating] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     if (showInput && inputRef.current) {
       inputRef.current.focus();
     }
   }, [showInput]);
+
+  // Auto-play video when active
+  useEffect(() => {
+    if (mediaType === 'video' && videoRef.current) {
+      if (isActive) {
+        // Small delay to ensure video is loaded
+        const playVideo = () => {
+          if (videoRef.current) {
+            videoRef.current.play().catch(err => {
+              console.log('Video autoplay failed, user interaction required:', err);
+            });
+          }
+        };
+        // Try to play immediately and also after a short delay
+        playVideo();
+        setTimeout(playVideo, 100);
+      } else {
+        videoRef.current.pause();
+        videoRef.current.currentTime = 0;
+      }
+    }
+  }, [isActive, mediaType]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,7 +77,19 @@ export default function ReelCard({ imageId, imageUrl, actualPrompt, onGuessSubmi
       });
 
       if (!response.ok) {
-        throw new Error('Failed to submit guess');
+        const errorData = await response.json();
+        console.error('API Error Response:', errorData);
+        throw new Error(errorData.details || errorData.error || 'Failed to submit guess');
+      }
+
+      const result = await response.json();
+      console.log('✅ Guess result:', result);
+
+      // Show success/failure message
+      if (result.isCorrect) {
+        alert(`🎉 Correct! You earned ${result.tokensEarned} DGEN tokens!\n\nSimilarity: ${result.similarityScore}%${result.minting?.signature ? '\n\nTransaction: ' + result.minting.signature.substring(0, 20) + '...' : ''}`);
+      } else {
+        alert(`❌ Not quite! Similarity: ${result.similarityScore}%\n\nTry again or scroll to the next challenge!`);
       }
 
       setGuess('');
@@ -60,13 +97,28 @@ export default function ReelCard({ imageId, imageUrl, actualPrompt, onGuessSubmi
       
       setTimeout(() => {
         onGuessSubmitted?.();
-      }, 300);
+      }, 500);
       
     } catch (error) {
       console.error('Error submitting guess:', error);
       alert('Failed to submit guess. Please try again.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleVideoClick = () => {
+    if (mediaType === 'video' && videoRef.current) {
+      if (videoRef.current.paused) {
+        videoRef.current.play().then(() => {
+          setIsPlaying(true);
+        }).catch(err => {
+          console.error('Play failed:', err);
+        });
+      } else {
+        videoRef.current.pause();
+        setIsPlaying(false);
+      }
     }
   };
 
@@ -113,8 +165,11 @@ export default function ReelCard({ imageId, imageUrl, actualPrompt, onGuessSubmi
 
   return (
     <div className="reel-card">
-      {/* Background Image */}
-      <div className="absolute inset-0 bg-black">
+      {/* Background Media (Image or Video) */}
+      <div 
+        className="absolute inset-0 bg-black"
+        onClick={mediaType === 'video' ? handleVideoClick : undefined}
+      >
         {imageLoading && (
           <div className="absolute inset-0 flex items-center justify-center bg-black">
             <Loader2 className="w-12 h-12 animate-spin text-white" />
@@ -125,17 +180,12 @@ export default function ReelCard({ imageId, imageUrl, actualPrompt, onGuessSubmi
           <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-900 to-pink-900">
             <div className="text-center p-8">
               <Sparkles className="w-16 h-16 text-white/70 mx-auto mb-4" />
-              <h3 className="text-xl font-bold text-white mb-2">Image Loading Error</h3>
-              <p className="text-white/70 text-sm mb-4">Unable to load the image</p>
+              <h3 className="text-xl font-bold text-white mb-2">{mediaType === 'video' ? 'Video' : 'Image'} Loading Error</h3>
+              <p className="text-white/70 text-sm mb-4">Unable to load the {mediaType}</p>
               <button
                 onClick={() => {
                   setImageError(false);
                   setImageLoading(true);
-                  // Force reload by adding timestamp
-                  const img = document.querySelector(`img[src="${imageUrl}"]`) as HTMLImageElement;
-                  if (img) {
-                    img.src = imageUrl + '?t=' + Date.now();
-                  }
                 }}
                 className="px-4 py-2 bg-white/20 backdrop-blur-md border border-white/30 rounded-xl text-white hover:bg-white/30 transition-colors"
               >
@@ -143,6 +193,39 @@ export default function ReelCard({ imageId, imageUrl, actualPrompt, onGuessSubmi
               </button>
             </div>
           </div>
+        ) : mediaType === 'video' ? (
+          <video
+            ref={videoRef}
+            src={imageUrl}
+            className="w-full h-full object-cover"
+            loop
+            muted
+            playsInline
+            autoPlay={isActive}
+            preload="auto"
+            onLoadedData={() => {
+              setImageLoading(false);
+              setImageError(false);
+              // Try to play when loaded if this is the active card
+              if (isActive && videoRef.current) {
+                videoRef.current.play().catch(err => console.log('Autoplay blocked:', err));
+              }
+            }}
+            onError={() => {
+              setImageLoading(false);
+              setImageError(true);
+            }}
+            onCanPlay={() => {
+              // Another attempt to play when video is ready
+              if (isActive && videoRef.current) {
+                videoRef.current.play()
+                  .then(() => setIsPlaying(true))
+                  .catch(err => console.log('Autoplay blocked:', err));
+              }
+            }}
+            onPlay={() => setIsPlaying(true)}
+            onPause={() => setIsPlaying(false)}
+          />
         ) : (
           <img
             src={imageUrl}
@@ -169,8 +252,22 @@ export default function ReelCard({ imageId, imageUrl, actualPrompt, onGuessSubmi
             <Sparkles className="w-4 h-4 text-yellow-400" />
             <span className="text-sm font-semibold text-white">AI Generated</span>
           </div>
+          {mediaType === 'video' && (
+            <div className="bg-red-600/80 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-2">
+              <span className="text-sm font-semibold text-white">🎬 VIDEO</span>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Video Play/Pause Overlay */}
+      {mediaType === 'video' && !isPlaying && !imageLoading && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+          <div className="w-20 h-20 bg-black/60 backdrop-blur-md rounded-full flex items-center justify-center">
+            <div className="w-0 h-0 border-l-[24px] border-l-white border-t-[14px] border-t-transparent border-b-[14px] border-b-transparent ml-2"></div>
+          </div>
+        </div>
+      )}
 
       {/* Right Side Actions (Instagram Style) */}
       <div className="absolute right-4 bottom-32 z-10 flex flex-col items-center gap-6">
@@ -223,7 +320,7 @@ export default function ReelCard({ imageId, imageUrl, actualPrompt, onGuessSubmi
               🎯 Guess the AI Prompt
             </h3>
             <p className="text-white/90 text-sm drop-shadow-lg">
-              What prompt created this image?
+              What prompt created this {mediaType}?
             </p>
           </div>
 

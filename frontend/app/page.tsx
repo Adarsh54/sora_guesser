@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import ReelCard from '@/components/ReelCard';
-import { Loader2, Menu, User, TrendingUp, Wallet, Copy, Check, LogOut, LogIn, RefreshCw } from 'lucide-react';
+import CreateModal from '@/components/CreateModal';
+import { Loader2, Menu, User, TrendingUp, Wallet, Copy, Check, LogOut, LogIn, RefreshCw, Plus } from 'lucide-react';
 import TokenBalance from '@/components/TokenBalance';
 import GameStats from '@/components/GameStats';
 import { useWallet } from '@solana/wallet-adapter-react';
@@ -13,6 +14,7 @@ interface Image {
   image_url: string;
   prompt: string;
   difficulty?: string;
+  media_type?: 'image' | 'video';
 }
 
 export default function Home() {
@@ -23,24 +25,39 @@ export default function Home() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showMenu, setShowMenu] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Fetch images from Supabase on mount
-  useEffect(() => {
-    const fetchImages = async () => {
-      try {
-        const response = await fetch('/api/images?limit=20');
-        if (response.ok) {
-          const data = await response.json();
-          setImages(data.images || []);
+  // Fetch images from Supabase
+  const fetchImages = async () => {
+    try {
+      console.log('🔍 Fetching media from API...');
+      const response = await fetch('/api/images?limit=20');
+      console.log('📡 Response status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Received data:', data);
+        console.log('📊 Number of items:', data.images?.length || 0);
+        
+        if (data.images && data.images.length > 0) {
+          console.log('🎬 First item type:', data.images[0].media_type);
+          console.log('🔗 First item URL:', data.images[0].image_url);
         }
-      } catch (error) {
-        console.error('Error fetching images:', error);
-      } finally {
-        setLoading(false);
+        
+        setImages(data.images || []);
+      } else {
+        console.error('❌ Response not OK:', response.status);
       }
-    };
+    } catch (error) {
+      console.error('❌ Error fetching images:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  // Fetch images on mount
+  useEffect(() => {
     fetchImages();
   }, []);
 
@@ -103,6 +120,11 @@ export default function Home() {
     setShowMenu(false);
   };
 
+  const handleCreateSuccess = () => {
+    // Refetch images to show the new challenge
+    fetchImages();
+  };
+
   // Show loading state
   if (loading) {
     return (
@@ -123,16 +145,16 @@ export default function Home() {
         <div className="max-w-md text-center">
           <h2 className="text-3xl font-bold text-white mb-4">No Images Yet!</h2>
           <p className="text-white/70 mb-6">
-            Add images to your Supabase database to start playing!
+            Generate images or videos to start playing!
           </p>
           <div className="bg-white/10 backdrop-blur-md p-6 rounded-2xl text-left border border-white/20">
-            <p className="text-sm text-white/70 mb-2">Option 1: Add via Supabase UI</p>
+            <p className="text-sm text-white/70 mb-2">Generate images:</p>
             <code className="text-sm text-purple-400 block mb-4">
-              Dashboard → Table Editor → images → Insert row
+              npm run generate:images -- --count=5
             </code>
-            <p className="text-sm text-white/70 mb-2">Option 2: Generate with AI</p>
+            <p className="text-sm text-white/70 mb-2">Generate videos:</p>
             <code className="text-sm text-purple-400 block">
-              cd frontend && npm run generate-images
+              npm run generate:videos -- --count=2
             </code>
           </div>
         </div>
@@ -151,7 +173,7 @@ export default function Home() {
           >
             <Menu className="w-5 h-5 text-white" />
           </button>
-          <h1 className="text-xl font-bold text-white drop-shadow-lg">Sora Guesser</h1>
+          <h1 className="text-xl font-bold text-white drop-shadow-lg">dgenerate</h1>
         </div>
         <div className="flex items-center gap-2">
           <button className="w-10 h-10 bg-black/40 backdrop-blur-md rounded-full flex items-center justify-center hover:bg-black/60 transition-colors">
@@ -176,6 +198,7 @@ export default function Home() {
             actualPrompt={image.prompt}
             onGuessSubmitted={handleGuessSubmitted}
             isActive={index === currentIndex}
+            mediaType={image.media_type || 'image'}
           />
         ))}
       </div>
@@ -290,7 +313,21 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* Floating Create Button */}
+      <button
+        onClick={() => setShowCreateModal(true)}
+        className="fixed bottom-24 right-6 z-40 w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 rounded-full flex items-center justify-center shadow-2xl transition-all hover:scale-110 active:scale-95"
+      >
+        <Plus className="w-8 h-8 text-white" />
+      </button>
+
+      {/* Create Modal */}
+      <CreateModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={handleCreateSuccess}
+      />
     </>
   );
 }
-
